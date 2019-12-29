@@ -11,7 +11,7 @@ namespace Wiki
     public interface IWiki : IAsyncDisposable
     {
         /// <summary>
-        /// The moniker for this wiki.
+        /// The moniker that uniquely defines this wiki (usually, but not always a URI).
         /// </summary>
         string Moniker { get; }
         /// <summary>
@@ -19,10 +19,20 @@ namespace Wiki
         /// </summary>
         WikiConnectivityStatus Status { get; }
         /// <summary>
+        /// Checks if we're in autosave mode, and/or requests that mode be changed.  If we're 
+        /// not in autosave mode, <see cref="SaveAsync"/> needs to be called before close.
+        /// </summary>
+        bool Autosave { get; set; }
+        /// <summary>
         /// Connects to the wiki if it wasn't already.
         /// </summary>
         /// <returns>Async handle.</returns>
         Task OpenAsync();
+        /// <summary>
+        /// Saves all outstanding changes.
+        /// </summary>
+        /// <returns>Async handle.</returns>
+        Task SaveAsync();
         /// <summary>
         /// Disconnects from the wiki (if connected).
         /// </summary>

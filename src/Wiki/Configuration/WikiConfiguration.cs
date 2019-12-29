@@ -16,6 +16,12 @@ namespace Wiki.Configuration
         }
 
         /// <summary>
+        /// Some providers support autosave, some do not.  When autosave is turned off, 
+        /// <see cref="IWiki.SaveAsync"/> needs to be called expressly.
+        /// </summary>
+        public bool PreferAutosave { get; set; }
+
+        /// <summary>
         /// Defines how and when we should attempt to retry operations.
         /// </summary>
         public IRetryPolicy RetryPolicy { get; set; } =

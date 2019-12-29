@@ -1,5 +1,7 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Text;
 using System.Threading.Tasks;
 using Wiki.Configuration;
@@ -11,6 +13,17 @@ namespace Wiki
     /// </summary>
     public abstract class WikiBase : IWiki
     {
+        #region Creation
+        static readonly JsonSerializerSettings Serialization = new JsonSerializerSettings
+        {
+            TypeNameAssemblyFormatHandling = TypeNameAssemblyFormatHandling.Simple,
+            TypeNameHandling = TypeNameHandling.Auto
+        };
+        /// <summary>
+        /// Creates a wiki.
+        /// </summary>
+        /// <param name="moniker">The address for this wiki.</param>
+        /// <param name="factory">The factory that produced it.</param>
         public WikiBase(string moniker, WikiFactoryBase factory)
         {
             if (string.IsNullOrWhiteSpace(moniker))
@@ -19,13 +32,50 @@ namespace Wiki
             }
 
             Moniker = moniker;
-            Factory = factory;
+            Factory = factory ?? throw new ArgumentNullException(nameof(factory));
+            Autosave = factory.Config.PreferAutosave;
         }
+        #endregion
 
-        public string Moniker { get; }
+        #region Data
+        /// <summary>
+        /// The factory that generated this wiki.
+        /// </summary>
         protected WikiFactoryBase Factory { get; }
+        #endregion
+
+        #region Lifecycle
+        /// <summary>
+        /// The moniker that uniquely defines this wiki (usually, but not always a URI).
+        /// </summary>
+        public string Moniker { get; }
+        /// <summary>
+        /// Determines whether the wiki is connected or not.
+        /// </summary>
         public WikiConnectivityStatus Status { get; private set; }
 
+        private bool _autosave = false;
+
+        /// <summary>
+        /// Checks if we're in autosave mode, and/or requests that mode be changed.  If we're 
+        /// not in autosave mode, <see cref="SaveAsync"/> needs to be called before close.
+        /// </summary>
+        public bool Autosave
+        {
+            get
+            {
+                return CannotAutosave() ? false : (_autosave || MustAutosave());
+            }
+            set
+            {
+                _autosave = value;
+            }
+        }
+
+        /// <summary>
+        /// Disconnects from the wiki (if connected).
+        /// </summary>
+        /// <returns>Async Handle.</returns>
         public async Task CloseAsync()
         {
             if (Status == WikiConnectivityStatus.Connected)
@@ -35,22 +85,25 @@ namespace Wiki
                 Status = WikiConnectivityStatus.Disconnected;
             }
         }
+        /// <summary>
+        /// Saves all outstanding changes.
+        /// </summary>
+        /// <returns>Async handle.</returns>
+        public abstract Task SaveAsync();
 
-        public Task DeleteAsync(string key)
-        {
-            throw new NotImplementedException();
-        }
-
+        /// <summary>
+        /// Disposes of this reference to the wiki, commiting any changes.
+        /// </summary>
+        /// <returns></returns>
         public ValueTask DisposeAsync()
         {
             return new ValueTask(CloseAsync());
         }
 
-        public Task<Article> GetAsync(string key)
-        {
-            throw new NotImplementedException();
-        }
-
+        /// <summary>
+        /// Connects to the wiki if it wasn't already.
+        /// </summary>
+        /// <returns>Async handle.</returns>
         public async Task OpenAsync()
         {
             if (Status == WikiConnectivityStatus.Disconnected)
@@ -60,20 +113,80 @@ namespace Wiki
                 Status = WikiConnectivityStatus.Connected;
             }
         }
+        #endregion
 
+        #region Article Methods
+        /// <summary>
+        /// Gets an article by it's key.
+        /// </summary>
+        /// <param name="key">The key to look for.</param>
+        /// <returns>The article for that key.</returns>
+        public async virtual Task<Article> GetAsync(string key)
+        {
+            Article article = null;
+            var stream = await GetStreamForKeyAsync(key, FileAccess.Read);
+            if (stream != null)
+            {
+                article = GetArticleFromStream(stream);
+            }
+            return article;
+        }
+
+        /// <summary>
+        /// Updates or inserts an article based off of whether or not it's 
+        /// <see cref="Article.Key"/> already exists.
+        /// </summary>
+        /// <param name="article">The article to upsert.</param>
+        /// <returns>Async key.</returns>
         public async Task UpsertAsync(Article article)
         {
             Stablize(article);
             await StoreAsync(article);
+            if(Autosave)
+            {
+                await SaveAsync();
+            }
+        }
+        /// <summary>
+        /// Delets the article with the given key.
+        /// </summary>
+        /// <param name="key">The key to delete.</param>
+        /// <returns>Async key.</returns>
+        public async Task DeleteAsync(string key)
+        {
+            await RemoveAsync(key);
+            if(Autosave)
+            {
+                await SaveAsync();
+            }
         }
 
+        #endregion
+
+
         #region Child interface
+        /// <summary>
+        /// Gets the stream containing the guts of a stream.  Not required if you also override 
+        /// <see cref="GetAsync(string)"/>.
+        /// </summary>
+        /// <param name="key">The key to get a stream for.</param>
+        /// <param name="access">The way to open the stream.</param>
+        /// <returns>The stream that contains the results, or null if the key doesn't exist.</returns>
+        protected abstract Task<Stream> GetStreamForKeyAsync(string key, FileAccess access);
         /// <summary>
         /// Stores a pristine article in the wiki.
         /// </summary>
         /// <param name="article">The article to store, no checks required.</param>
         /// <returns>Async handle.</returns>
         protected abstract Task StoreAsync(Article article);
+
+        /// <summary>
+        /// Removes a record from the underlying stoe.
+        /// </summary>
+        /// <param name="key"></param>
+        /// <returns></returns>
+        protected abstract Task RemoveAsync(string key);
+
 
         /// <summary>
         /// Connects to a remote source (if required).
@@ -91,10 +204,50 @@ namespace Wiki
         {
             return Task.CompletedTask;
         }
+
+        /// <summary>
+        /// Override this method to return <see langword="true"/> if this provider requires auto-save on.
+        /// </summary>
+        /// <returns>Whether or not to auto-save.</returns>
+        protected virtual bool MustAutosave()
+        {
+            return false;
+        }
+        /// <summary>
+        /// Override this method to return <see langword="true"/> if this provider cannot have auto-save on.
+        /// </summary>
+        /// <returns>Whether auto-save is supported.</returns>
+        protected virtual bool CannotAutosave()
+        {
+            return false;
+        }
         #endregion
 
-
         #region Helpers
+        /// <summary>
+        /// Parses an article from a stream.
+        /// </summary>
+        /// <param name="stream">The stream to parse.</param>
+        /// <returns>The contents of the stream.</returns>
+        private Article GetArticleFromStream(Stream stream)
+        {
+            using var reader = new StreamReader(stream, Encoding.UTF8);
+            var json = reader.ReadToEnd();
+            return JsonConvert.DeserializeObject<Article>(json, Serialization);
+        }
+
+        /// <summary>
+        /// Writes an article to a stream.
+        /// </summary>
+        /// <param name="article">The article to write.</param>
+        /// <param name="stream">The stream to write it to.</param>
+        protected async Task WriteArticleToStream(Article article, Stream stream)
+        {
+            var json = JsonConvert.SerializeObject(article, Formatting.None, Serialization);
+            var bytes = Encoding.UTF8.GetBytes(json);
+            await stream.WriteAsync(bytes);
+        }
+
         protected IRetryPolicy Retry { get { return Factory.Config.RetryPolicy; } }
         /// <summary>
         /// Confirms that we're connected when the method ends.

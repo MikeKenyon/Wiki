@@ -5,6 +5,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="SharpFileSystem" Version="1.0.0.37" />
+    <PackageReference Include="SharpFileSystem.SharpZipLib" Version="1.0.0.37" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Wiki\Wiki.csproj" />
   </ItemGroup>
 
