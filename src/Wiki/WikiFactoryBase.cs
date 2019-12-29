@@ -137,7 +137,10 @@ namespace Wiki
         protected abstract Task<IWiki> OpenAsync(string moniker);
         protected abstract Task<bool> FoundAsync(string moniker);
         protected abstract bool IsMine(IWiki wiki);
-        protected abstract Task CloseAsync(IWiki wiki);
+        protected virtual async Task CloseAsync(IWiki wiki)
+        {
+            await wiki.DisposeAsync();
+        }
 
 
         /// <summary>

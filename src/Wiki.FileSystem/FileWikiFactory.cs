@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 
 namespace Wiki.FileSystem
@@ -10,34 +11,42 @@ namespace Wiki.FileSystem
         {
 
         }
-        protected override Task CloseAsync(IWiki wiki)
+        protected override async Task<IWiki> OpenAsync(string moniker)
         {
-            throw new NotImplementedException();
+            var wiki = new FileWiki(new FileInfo(moniker), this);
+            await wiki.LoadAsync();
+            return wiki;
         }
 
         protected override Task<IWiki> CreateAsync(string moniker)
         {
-            throw new NotImplementedException();
+            var wiki = new FileWiki(new FileInfo(moniker), this);
+            return Task.FromResult<IWiki>(wiki);
         }
 
         protected override Task<bool> FoundAsync(string moniker)
         {
-            throw new NotImplementedException();
+            return Task.FromResult(File.Exists(moniker));
         }
 
         protected override bool IsMine(IWiki wiki)
         {
-            throw new NotImplementedException();
+            return wiki is FileWiki;
         }
 
+        [MethodImpl(MethodImplOptions.NoOptimization | MethodImplOptions.NoInlining)]
         protected override bool IsValidMoniker(string moniker)
         {
-            throw new NotImplementedException();
+            try
+            {
+                Path.GetFullPath(moniker);
+                return !Directory.Exists(moniker); // Must therefore be a legal file name.
+            }
+            catch // Throws exceptions on invalid paths.
+            {
+                return false;
+            }
         }
 
-        protected override Task<IWiki> OpenAsync(string moniker)
-        {
-            throw new NotImplementedException();
-        }
     }
 }
