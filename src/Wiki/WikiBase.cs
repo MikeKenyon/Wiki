@@ -129,6 +129,7 @@ namespace Wiki
             {
                 article = GetArticleFromStream(stream);
             }
+            await stream.DisposeAsync();
             return article;
         }
 
@@ -138,7 +139,7 @@ namespace Wiki
         /// </summary>
         /// <param name="article">The article to upsert.</param>
         /// <returns>Async key.</returns>
-        public async Task UpsertAsync(Article article)
+        public virtual async Task UpsertAsync(Article article)
         {
             Stablize(article);
             await StoreAsync(article);
@@ -243,9 +244,19 @@ namespace Wiki
         /// <param name="stream">The stream to write it to.</param>
         protected async Task WriteArticleToStream(Article article, Stream stream)
         {
-            var json = JsonConvert.SerializeObject(article, Formatting.None, Serialization);
+            var json = ConvertArticleToJson(article);
             var bytes = Encoding.UTF8.GetBytes(json);
             await stream.WriteAsync(bytes);
+        }
+
+        /// <summary>
+        /// Converts an article to JSON.
+        /// </summary>
+        /// <param name="article">The article to convert.</param>
+        /// <returns>The cardinal JSON form of it.</returns>
+        protected string ConvertArticleToJson(Article article)
+        {
+            return JsonConvert.SerializeObject(article, Formatting.None, Serialization);
         }
 
         protected IRetryPolicy Retry { get { return Factory.Config.RetryPolicy; } }
@@ -279,7 +290,7 @@ namespace Wiki
         /// Ensures the article is ready to be saved.
         /// </summary>
         /// <param name="article"></param>
-        private void Stablize(Article article)
+        protected void Stablize(Article article)
         {
             // Key
             if(string.IsNullOrWhiteSpace(article.Key))

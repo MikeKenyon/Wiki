@@ -5,8 +5,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="SharpFileSystem" Version="1.0.0.37" />
-    <PackageReference Include="SharpFileSystem.SharpZipLib" Version="1.0.0.37" />
+    <PackageReference Include="DotNetZip" Version="1.13.5" />
   </ItemGroup>
 
   <ItemGroup>

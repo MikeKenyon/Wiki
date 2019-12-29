@@ -1,11 +1,10 @@
-﻿using System;
+﻿using Ionic.Zip;
+using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using SharpFileSystem;
-using SharpFileSystem.FileSystems;
-using SharpFileSystem.SharpZipLib;
 
 namespace Wiki.FileSystem
 {
@@ -17,12 +16,20 @@ namespace Wiki.FileSystem
         }
 
         public FileInfo File { get; }
-        private SharpZipLibFileSystem Store { get; set; }
+        private bool IsFileNew { get; set; }
+        private ZipFile Store { get; set; }
 
         protected override Task ConnectAsync()
         {
-            var stream = File.Open(FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
-            Store = SharpZipLibFileSystem.Create(stream);
+            if(File.Exists)
+            {
+                Store = new ZipFile(File.FullName, Encoding.UTF8);
+            }
+            else
+            {
+                IsFileNew = true;
+                Store = new ZipFile();
+            }
             return Task.CompletedTask;
         }
 
@@ -35,30 +42,65 @@ namespace Wiki.FileSystem
 
         internal async Task LoadAsync()
         {
-            foreach(var entity in Store.GetEntitiesRecursive(FileSystemPath.Root))
+            foreach(var entry in Store)
             {
-                var article = await GetAsync(entity.EntityName);
+                if(entry.IsDirectory)
+                {
+                    continue;
+                }
+                var article = await GetAsync(entry.FileName);
                 await Index(article);
             }
         }
 
         public override Task SaveAsync()
         {
-            Store.ZipFile.CommitUpdate();
+            Store.Save(File.FullName);
             return Task.CompletedTask;
         }
 
         protected override Task<Stream> GetStreamForKeyAsync(string key, FileAccess access)
         {
+            Stream stream = null;
             var path = KeyToFilePath(key);
-            return Task.FromResult(Store.OpenFile(path, access));
+            var entry = (from e in Store.Entries
+                         where e.FileName == key
+                         select e).FirstOrDefault();
+            if(entry != null)
+            {
+                stream = entry.OpenReader();
+            }
+            return Task.FromResult(stream);
+        }
+        /// <summary>
+        /// Updates or inserts an article based off of whether or not it's 
+        /// <see cref="Article.Key"/> already exists.
+        /// </summary>
+        /// <param name="article">The article to upsert.</param>
+        /// <returns>Async key.</returns>
+        public override async Task UpsertAsync(Article article)
+        {
+            Stablize(article);
+            var json = ConvertArticleToJson(article);
+            var path = KeyToFilePath(article.Key);
+            //TODO: Test next line, not sure if the entry contains path.
+            if(Store.ContainsEntry(path))
+            {
+                Store.UpdateEntry(path, json);
+            }
+            else
+            {
+                Store.AddEntry(path, json);
+            }
+            if (Autosave)
+            {
+                await SaveAsync();
+            }
         }
 
-        protected async override Task StoreAsync(Article article)
+        protected override Task StoreAsync(Article article)
         {
-            var stream = await GetStreamForKeyAsync(article.Key, FileAccess.Write);
-            stream.Position = 0;
-            await WriteArticleToStream(article, stream);
+            throw new NotImplementedException("StoreAsync() isn't implemented, use UpsertAsync()");
         }
         /// <summary>
         /// Removes a record from the underlying stoe.
@@ -67,7 +109,7 @@ namespace Wiki.FileSystem
         /// <returns></returns>
         protected override Task RemoveAsync(string key)
         {
-            Store.Delete(KeyToFilePath(key));
+            Store.RemoveEntry(KeyToFilePath(key));
             return Task.CompletedTask;
         }
 
@@ -77,18 +119,16 @@ namespace Wiki.FileSystem
             //TODO: Need to index the article.
             return Task.CompletedTask;
         }
-        private FileSystemPath KeyToFilePath(string key)
+
+        private string KeyToFilePath(string key)
         {
-            var path = key.Length switch
+            return key.Length switch
             {
                 1 => $"{key}/{key}",
                 2 => $"{key[0]}/{key[1]}/{key}",
                 _ => $"{key[0]}/{key[1]}/{key[2]}/{key}"
             };
-            return FileSystemPath.Parse(path);
         }
-
-
         #endregion
 
     }
