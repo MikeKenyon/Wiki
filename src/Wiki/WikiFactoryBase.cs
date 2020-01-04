@@ -89,8 +89,9 @@ namespace Wiki
                             wiki = await OpenAsync(moniker);
                             done = true;
                         }
-                        catch
+                        catch (Exception ex)
                         {
+                            //TODO: Logging here.
                             info.PriorAttempts++;
                             info = retry.ShouldRetry(info);
                             if (info.Done)
@@ -121,7 +122,7 @@ namespace Wiki
                             break;
                         case WikiMissingBehavior.Throw:
                             throw new WikiNotFoundException(moniker);
-                    };
+                    }
                 }
             }
             else if(options.ThrowOnInvalid)

@@ -14,14 +14,16 @@ namespace Wiki.FileSystem
         protected override async Task<IWiki> OpenAsync(string moniker)
         {
             var wiki = new FileWiki(new FileInfo(moniker), this);
+            await wiki.OpenAsync();
             await wiki.LoadAsync();
             return wiki;
         }
 
-        protected override Task<IWiki> CreateAsync(string moniker)
+        protected override async Task<IWiki> CreateAsync(string moniker)
         {
             var wiki = new FileWiki(new FileInfo(moniker), this);
-            return Task.FromResult<IWiki>(wiki);
+            await wiki.OpenAsync();
+            return wiki;
         }
 
         protected override Task<bool> FoundAsync(string moniker)

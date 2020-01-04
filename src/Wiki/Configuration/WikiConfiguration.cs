@@ -22,6 +22,11 @@ namespace Wiki.Configuration
         public bool PreferAutosave { get; set; }
 
         /// <summary>
+        /// Indicates that the wiki should endevour to be threadsafe.
+        /// </summary>
+        public bool ThreadSafe { get; set; }
+
+        /// <summary>
         /// Defines how and when we should attempt to retry operations.
         /// </summary>
         public IRetryPolicy RetryPolicy { get; set; } =

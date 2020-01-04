@@ -17,7 +17,18 @@ namespace Wiki.FileSystem
 
         public FileInfo File { get; }
         private bool IsFileNew { get; set; }
-        private ZipFile Store { get; set; }
+        private ZipFile _store;
+
+        public ZipFile Store
+        {
+            get {
+                if(_store == null)
+                {
+                    throw new InvalidOperationException("Have not called OpenAsync() yet. ");
+                }
+                return _store; }
+            set { _store = value; }
+        }
 
         protected override Task ConnectAsync()
         {
@@ -53,6 +64,15 @@ namespace Wiki.FileSystem
             }
         }
 
+        /// <summary>
+        /// File-based wikis should cache their contents.
+        /// </summary>
+        /// <returns><see langword="true"/>, indicating we should cache.</returns>
+        protected override bool CachesContent()
+        {
+            return true;
+        }
+
         public override Task SaveAsync()
         {
             Store.Save(File.FullName);
@@ -64,7 +84,7 @@ namespace Wiki.FileSystem
             Stream stream = null;
             var path = KeyToFilePath(key);
             var entry = (from e in Store.Entries
-                         where e.FileName == key
+                         where string.Equals(e.FileName, key, StringComparison.OrdinalIgnoreCase)
                          select e).FirstOrDefault();
             if(entry != null)
             {
@@ -103,6 +123,14 @@ namespace Wiki.FileSystem
             throw new NotImplementedException("StoreAsync() isn't implemented, use UpsertAsync()");
         }
         /// <summary>
+        /// File-based wikis shouldn't need to have case sensitive keys.
+        /// </summary>
+        /// <returns></returns>
+        protected override bool KeysCaseSensitive()
+        {
+            return false;
+        }
+        /// <summary>
         /// Removes a record from the underlying stoe.
         /// </summary>
         /// <param name="key"></param>
@@ -122,11 +150,12 @@ namespace Wiki.FileSystem
 
         private string KeyToFilePath(string key)
         {
+            var route = key.ToLowerInvariant();
             return key.Length switch
             {
-                1 => $"{key}/{key}",
-                2 => $"{key[0]}/{key[1]}/{key}",
-                _ => $"{key[0]}/{key[1]}/{key[2]}/{key}"
+                1 => $"{route}/{key}",
+                2 => $"{route[0]}/{route[1]}/{key}",
+                _ => $"{route[0]}/{route[1]}/{route[2]}/{key}"
             };
         }
         #endregion

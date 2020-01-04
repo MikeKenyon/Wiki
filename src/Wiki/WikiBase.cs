@@ -1,4 +1,6 @@
-﻿using Newtonsoft.Json;
+﻿using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -31,9 +33,29 @@ namespace Wiki
                 throw new ArgumentException("No moniker provided.", nameof(moniker));
             }
 
+            //TODO: Add Logger to this lazy init.
+            CacheRepo = new Lazy<MemoryCache>(
+                () => new MemoryCache(
+                    new OptionsWrapper<MemoryCacheOptions>(
+                        new MemoryCacheOptions())));
+
             Moniker = moniker;
             Factory = factory ?? throw new ArgumentNullException(nameof(factory));
             Autosave = factory.Config.PreferAutosave;
+        }
+        protected void InvalidCache(string key = null)
+        {
+            if(CachesContent())
+            {
+                if (string.IsNullOrWhiteSpace(key))
+                {
+                    CacheRepo.Value.Compact(1.00);
+                }
+                else
+                {
+                    CacheRepo.Value.Remove(key);
+                }
+            }
         }
         #endregion
 
@@ -52,7 +74,7 @@ namespace Wiki
         /// <summary>
         /// Determines whether the wiki is connected or not.
         /// </summary>
-        public WikiConnectivityStatus Status { get; private set; }
+        public WikiConnectivityStatus Status { get; private set; } = WikiConnectivityStatus.Disconnected;
 
         private bool _autosave = false;
 
@@ -123,13 +145,18 @@ namespace Wiki
         /// <returns>The article for that key.</returns>
         public async virtual Task<Article> GetAsync(string key)
         {
-            Article article = null;
-            var stream = await GetStreamForKeyAsync(key, FileAccess.Read);
-            if (stream != null)
+            key = ConformKey(key);
+            var article = CheckCache(key);
+            if (article == null)
             {
-                article = GetArticleFromStream(stream);
+                var stream = await GetStreamForKeyAsync(key, FileAccess.Read);
+                if (stream != null)
+                {
+                    article = GetArticleFromStream(stream);
+                    await stream.DisposeAsync();
+                    Cache(article);
+                }
             }
-            await stream.DisposeAsync();
             return article;
         }
 
@@ -142,6 +169,7 @@ namespace Wiki
         public virtual async Task UpsertAsync(Article article)
         {
             Stablize(article);
+            Cache(article);
             await StoreAsync(article);
             if(Autosave)
             {
@@ -222,9 +250,66 @@ namespace Wiki
         {
             return false;
         }
+        /// <summary>
+        /// Indicates if a cache should be made of content loaded.
+        /// </summary>
+        /// <returns>Whether or not to create/maintain such a cache.</returns>
+        protected virtual bool CachesContent()
+        {
+            return false;
+        }
+        protected virtual bool KeysCaseSensitive()
+        {
+            return true;
+        }
         #endregion
 
         #region Helpers
+
+        #region Caching
+        /// <summary>
+        /// Checks for the article in the internal cache.
+        /// </summary>
+        /// <param name="key"></param>
+        /// <returns></returns>
+        protected Article CheckCache(string key)
+        {
+            Article response = null;
+            if(CachesContent())
+            {
+                if(!CacheRepo.Value.TryGetValue(key, out response))
+                {
+                    response = null;
+                }
+            }
+            return response;
+        }
+        /// <summary>
+        /// Caches the value.
+        /// </summary>
+        /// <param name="article">The article to cache.</param>
+        protected void Cache(Article article)
+        {
+            if(CachesContent())
+            {
+                CacheRepo.Value.Set(ConformKey(article.Key), article);
+            }
+        }
+        private Lazy<MemoryCache> CacheRepo { get; set; }
+        #endregion
+
+        #region Keys
+        /// <summary>
+        /// Conforms the key to rules.
+        /// </summary>
+        /// <param name="key"></param>
+        /// <returns></returns>
+        public string ConformKey(string key)
+        {
+            return KeysCaseSensitive() ? key : key.ToLowerInvariant();
+        }
+        #endregion
+
         /// <summary>
         /// Parses an article from a stream.
         /// </summary>
@@ -301,7 +386,7 @@ namespace Wiki
                 }
                 else
                 {
-                    article.Key = article.Title.Sanatize();
+                    article.Key = ConformKey(article.Title.Sanatize());
                 }
             }
             article.Key = article.Key.Trim();
