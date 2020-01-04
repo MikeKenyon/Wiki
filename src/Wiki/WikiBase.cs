@@ -397,7 +397,7 @@ namespace Wiki
             }
             article.Title = article.Title.Trim();
             // Body
-            article.Body.Apply(content => content.Stablize(article));
+            article.Content.Apply(content => content.Stablize(article));
             // Modified
             article.Modified = DateTimeOffset.Now;
         }

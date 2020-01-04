@@ -1,5 +1,7 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using System;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using Wiki.Resources;
 
@@ -10,7 +12,15 @@ namespace Wiki
     /// </summary>
     public sealed class Article 
     {
+        #region Data
+        [JsonProperty("Content")]
+        internal ObservableCollection<Content> _content = new ObservableCollection<Content>();
+        #endregion
         #region Construction
+        public Article()
+        {
+            Content = new ReadOnlyObservableCollection<Content>(_content);   
+        }
         #endregion
 
         #region Properties
@@ -35,10 +45,29 @@ namespace Wiki
         /// <summary>
         /// The contents of this article
         /// </summary>
-        public ObservableCollection<Content> Body { get; } = new ObservableCollection<Content>();
+        [JsonIgnore]
+        public ReadOnlyObservableCollection<Content> Content { get; }
         #endregion
 
         #region Methods
+        /// <summary>
+        /// Sets a content type for this record.  An article can contain each content type once.
+        /// </summary>
+        /// <typeparam name="TContentType">The type of content to set.</typeparam>
+        /// <param name="content">The content to set.</param>
+        /// <returns>This article (for fluent purposes)</returns>
+        public Article Set<TContentType>(TContentType content) where TContentType : Content
+        {
+            var existing = _content
+                .FirstOrDefault(c => c.GetType() == typeof(TContentType));
+            if(existing != null)
+            {
+                _content.Remove(existing);
+            }
+            _content.Add(content);
+
+            return this;
+        }
         #endregion
 
         #region Overrides

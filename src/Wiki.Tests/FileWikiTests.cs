@@ -34,11 +34,8 @@ namespace Wiki.Tests
                 };
                 var article = new Article
                 {
-                    Title = "Test",
-                    Body =  {
-                    new Body { Markdown = "This is **content**."}
-                }
-                };
+                    Title = "Test", 
+                }.Set<Body>(new Body { Markdown = "This is **content**." });
                 // Act
                 wiki = await factory.OpenWikiAsync(path, options);
                 await wiki.UpsertAsync(article);
@@ -86,10 +83,7 @@ namespace Wiki.Tests
                 var article = new Article
                 {
                     Title = "Test",
-                    Body =  {
-                    new Body { Markdown = "This is **content**."}
-                }
-                };
+                }.Set<Body>(new Body { Markdown = "This is **content**." });
                 // Act
                 wiki = await factory.OpenWikiAsync(path, create);
                 await wiki.UpsertAsync(article);
@@ -121,10 +115,10 @@ namespace Wiki.Tests
             Assert.AreEqual(article.Title, result.Title);
             Assert.AreEqual(article.Created, result.Created);
             Assert.AreEqual(article.Modified, result.Modified);
-            Assert.AreEqual(article.Body.Count, result.Body.Count);
-            Assert.IsInstanceOfType(result.Body[0], typeof(Body));
-            var made = article.Body[0] as Body;
-            var found = article.Body[0] as Body;
+            Assert.AreEqual(article.Content.Count, result.Content.Count);
+            Assert.IsInstanceOfType(result.Content[0], typeof(Body));
+            var made = article.Content[0] as Body;
+            var found = article.Content[0] as Body;
             Assert.AreEqual(made.Markdown, found.Markdown);
         }
 
@@ -157,17 +151,11 @@ namespace Wiki.Tests
                 var first = new Article
                 {
                     Title = "Test",
-                    Body =  {
-                        new Body { Markdown = "This is **content**."}
-                    }
-                };
+                }.Set<Body>(new Body { Markdown = "This is **content**." });
                 var second = new Article
                 {
                     Title = "Alternate Content",
-                    Body =  {
-                        new Body { Markdown = "This is **alternate content**."}
-                    }
-                };
+                }.Set<Body>(new Body { Markdown = "This is **alternate content**." });
                 // Act
                 wiki = await factory.OpenWikiAsync(path, create);
                 await wiki.UpsertAsync(first);
@@ -232,17 +220,11 @@ namespace Wiki.Tests
                 var first = new Article
                 {
                     Title = "Test",
-                    Body =  {
-                        new Body { Markdown = "This is **content**."}
-                    }
-                };
+                }.Set<Body>(new Body { Markdown = "This is **content**." });
                 var second = new Article
                 {
                     Title = "Alternate Content",
-                    Body =  {
-                        new Body { Markdown = "This is **alternate content**."}
-                    }
-                };
+                }.Set<Body>(new Body { Markdown = "This is **alternate content**." });
                 // Act
                 wiki = await factory.OpenWikiAsync(path, create);
                 await wiki.UpsertAsync(first);
