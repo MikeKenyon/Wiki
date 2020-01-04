@@ -56,6 +56,10 @@ namespace Wiki
         /// <typeparam name="TContentType">The type of content to set.</typeparam>
         /// <param name="content">The content to set.</param>
         /// <returns>This article (for fluent purposes)</returns>
+        /// <remarks>
+        /// Setting a content type to <see langword="null"/> effectively removes that 
+        /// content type from the record.
+        /// </remarks>
         public Article Set<TContentType>(TContentType content) where TContentType : Content
         {
             var existing = _content
@@ -64,7 +68,10 @@ namespace Wiki
             {
                 _content.Remove(existing);
             }
-            _content.Add(content);
+            if (content != null)
+            {
+                _content.Add(content);
+            }
 
             return this;
         }
