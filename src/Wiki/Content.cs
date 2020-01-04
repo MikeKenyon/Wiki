@@ -18,5 +18,12 @@ namespace Wiki
         {
 
         }
+        /// <summary>
+        /// Acknowledges that the content has been restored from being serialized.
+        /// </summary>
+        /// <param name="article">The article this content is part of.</param>
+        protected internal virtual void Rehydrate(Article article)
+        { 
+        }
     }
 }

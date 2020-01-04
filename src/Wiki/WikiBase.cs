@@ -319,7 +319,12 @@ namespace Wiki
         {
             using var reader = new StreamReader(stream, Encoding.UTF8);
             var json = reader.ReadToEnd();
-            return JsonConvert.DeserializeObject<Article>(json, Serialization);
+            var article = JsonConvert.DeserializeObject<Article>(json, Serialization);
+            foreach(var content in article.Content)
+            {
+                content.Rehydrate(article);
+            }
+            return article;
         }
 
         /// <summary>
