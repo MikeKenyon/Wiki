@@ -79,32 +79,38 @@ namespace Wiki.FileSystem
             return Task.CompletedTask;
         }
 
-        protected override Task<Stream> GetStreamForKeyAsync(string key, FileAccess access)
+        protected override Task<Stream> GetStreamForKeyAsync(WikiEntryType type,
+            string key, FileAccess access)
         {
             Stream stream = null;
-            var path = KeyToFilePath(key);
+            string path = null;
+            switch (type)
+            {
+                case WikiEntryType.Metadata:
+                    path = @$"Metadata\{key}";
+                    break;
+                case WikiEntryType.Article:
+                    path = KeyToFilePath(key);
+                    break;
+                default:
+                    throw new NotImplementedException($"Entry type {type} is not handled.");
+            }
             var entry = (from e in Store.Entries
                          where string.Equals(e.FileName, key, StringComparison.OrdinalIgnoreCase)
                          select e).FirstOrDefault();
-            if(entry != null)
+            if (entry != null)
             {
                 stream = entry.OpenReader();
             }
             return Task.FromResult(stream);
         }
-        /// <summary>
-        /// Updates or inserts an article based off of whether or not it's 
-        /// <see cref="Article.Key"/> already exists.
-        /// </summary>
-        /// <param name="article">The article to upsert.</param>
-        /// <returns>Async key.</returns>
-        public override async Task UpsertAsync(Article article)
+
+        protected override Task StoreAsync(Article article)
         {
-            Stablize(article);
-            var json = ConvertArticleToJson(article);
+            var json = ConvertEntryToJson(article);
             var path = KeyToFilePath(article.Key);
             //TODO: Test next line, not sure if the entry contains path.
-            if(Store.ContainsEntry(path))
+            if (Store.ContainsEntry(path))
             {
                 Store.UpdateEntry(path, json);
             }
@@ -112,15 +118,7 @@ namespace Wiki.FileSystem
             {
                 Store.AddEntry(path, json);
             }
-            if (Autosave)
-            {
-                await SaveAsync();
-            }
-        }
-
-        protected override Task StoreAsync(Article article)
-        {
-            throw new NotImplementedException("StoreAsync() isn't implemented, use UpsertAsync()");
+            return Task.CompletedTask;
         }
         /// <summary>
         /// File-based wikis shouldn't need to have case sensitive keys.
@@ -157,6 +155,22 @@ namespace Wiki.FileSystem
                 2 => $"{route[0]}/{route[1]}/{key}",
                 _ => $"{route[0]}/{route[1]}/{route[2]}/{key}"
             };
+        }
+
+        protected override Task StoreAsync(MetadataInfo metadata)
+        {
+            var json = ConvertEntryToJson(metadata);
+            var path = @$"Metdata\{metadata.GetType().Name}";
+            //TODO: Test next line, not sure if the entry contains path.
+            if (Store.ContainsEntry(path))
+            {
+                Store.UpdateEntry(path, json);
+            }
+            else
+            {
+                Store.AddEntry(path, json);
+            }
+            return Task.CompletedTask;
         }
         #endregion
 

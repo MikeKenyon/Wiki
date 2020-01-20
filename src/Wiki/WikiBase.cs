@@ -3,6 +3,7 @@ using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
@@ -21,12 +22,13 @@ namespace Wiki
             TypeNameAssemblyFormatHandling = TypeNameAssemblyFormatHandling.Simple,
             TypeNameHandling = TypeNameHandling.Auto
         };
+
         /// <summary>
         /// Creates a wiki.
         /// </summary>
         /// <param name="moniker">The address for this wiki.</param>
         /// <param name="factory">The factory that produced it.</param>
-        public WikiBase(string moniker, WikiFactoryBase factory)
+        protected WikiBase(string moniker, WikiFactoryBase factory)
         {
             if (string.IsNullOrWhiteSpace(moniker))
             {
@@ -64,6 +66,10 @@ namespace Wiki
         /// The factory that generated this wiki.
         /// </summary>
         protected WikiFactoryBase Factory { get; }
+        /// <summary>
+        /// The cache of loaded metadata.
+        /// </summary>
+        private Dictionary<Type, MetadataInfo> _mdCache = new Dictionary<Type, MetadataInfo>();
         #endregion
 
         #region Lifecycle
@@ -149,10 +155,11 @@ namespace Wiki
             var article = CheckCache(key);
             if (article == null)
             {
-                var stream = await GetStreamForKeyAsync(key, FileAccess.Read);
+                var stream = await GetStreamForKeyAsync(WikiEntryType.Article,
+                    key, FileAccess.Read);
                 if (stream != null)
                 {
-                    article = GetArticleFromStream(stream);
+                    article = GetEntryFromStream<Article>(stream);
                     await stream.DisposeAsync();
                     Cache(article);
                 }
@@ -168,14 +175,17 @@ namespace Wiki
         /// <returns>Async key.</returns>
         public virtual async Task UpsertAsync(Article article)
         {
+            if (article is null)
+            {
+                throw new ArgumentNullException(nameof(article));
+            }
+
             Stablize(article);
             Cache(article);
             await StoreAsync(article);
-            if(Autosave)
-            {
-                await SaveAsync();
-            }
+            await AutoSaveCheckAsync();
         }
+
         /// <summary>
         /// Delets the article with the given key.
         /// </summary>
@@ -192,22 +202,65 @@ namespace Wiki
 
         #endregion
 
+        #region Metadata
+        public async Task<TMetadata> Metadata<TMetadata>() where TMetadata : MetadataInfo, new()
+        {
+            // Cache check
+            var type = typeof(TMetadata);
+            TMetadata result = null;
+            if (_mdCache.ContainsKey(type))
+            {
+                result = _mdCache[type] as TMetadata;
+            }
+            else
+            {
+                // Did we previously have one?
+                var stream = await GetStreamForKeyAsync(WikiEntryType.Metadata,
+                    type.Name, FileAccess.Read);
+                // If not, make a new one 
+                if (stream == null)
+                {
+                    result = new TMetadata();
+                }
+                // if so deserialize it.
+                else
+                {
+                    result = GetEntryFromStream<TMetadata>(stream);
+                }
+                // Cache it and listen to it.
+                _mdCache[type] = result;
+                result.PropertyChanged += OnMetadataChanged;
+                await StoreAsync(result);
+            }
+            return result;
+        }
+
+        #endregion
 
         #region Child interface
         /// <summary>
         /// Gets the stream containing the guts of a stream.  Not required if you also override 
         /// <see cref="GetAsync(string)"/>.
         /// </summary>
-        /// <param name="key">The key to get a stream for.</param>
+        /// <param name="entryType">Type of entry this is for.</param>
+        /// <param name="key">The key to get a stream for, for metadata this is the class name.</param>
         /// <param name="access">The way to open the stream.</param>
         /// <returns>The stream that contains the results, or null if the key doesn't exist.</returns>
-        protected abstract Task<Stream> GetStreamForKeyAsync(string key, FileAccess access);
+        protected abstract Task<Stream> GetStreamForKeyAsync(WikiEntryType entryType,
+            string key, FileAccess access);
         /// <summary>
         /// Stores a pristine article in the wiki.
         /// </summary>
         /// <param name="article">The article to store, no checks required.</param>
         /// <returns>Async handle.</returns>
         protected abstract Task StoreAsync(Article article);
+        /// <summary>
+        /// Stores a pristine chunk of metadata in the wiki.
+        /// </summary>
+        /// <param name="metadata">The metadata to store, no checks required.</param>
+        /// <returns>Async handle.</returns>
+        protected abstract Task StoreAsync(MetadataInfo metadata);
+
 
         /// <summary>
         /// Removes a record from the underlying stoe.
@@ -310,21 +363,38 @@ namespace Wiki
         }
         #endregion
 
+        #region Metadata
+        /// <summary>
+        /// When a metadata object associated with this wiki is updated, save that,
+        /// maybe.
+        /// </summary>
+        /// <param name="sender">Used to get the type from.</param>
+        /// <param name="e">Ignored.</param>
+        private void OnMetadataChanged(object sender, PropertyChangedEventArgs e)
+        {
+            var type = sender.GetType();
+            //TODO: Do this async with a Polly listener.
+            //TODO: Replace current retry with polly
+            StoreAsync(sender as MetadataInfo)
+                .ContinueWith(t => AutoSaveCheckAsync())
+                .Wait();
+        }
+
+        #endregion
+
+        #region Serialization
         /// <summary>
         /// Parses an article from a stream.
         /// </summary>
         /// <param name="stream">The stream to parse.</param>
         /// <returns>The contents of the stream.</returns>
-        private Article GetArticleFromStream(Stream stream)
+        private T GetEntryFromStream<T>(Stream stream) where T : IHydrate
         {
             using var reader = new StreamReader(stream, Encoding.UTF8);
             var json = reader.ReadToEnd();
-            var article = JsonConvert.DeserializeObject<Article>(json, Serialization);
-            foreach(var content in article.Content)
-            {
-                content.Rehydrate(article);
-            }
-            return article;
+            var entry = JsonConvert.DeserializeObject<T>(json, Serialization);
+            entry.Rehydrate();
+            return entry;
         }
 
         /// <summary>
@@ -334,7 +404,7 @@ namespace Wiki
         /// <param name="stream">The stream to write it to.</param>
         protected async Task WriteArticleToStream(Article article, Stream stream)
         {
-            var json = ConvertArticleToJson(article);
+            var json = ConvertEntryToJson(article);
             var bytes = Encoding.UTF8.GetBytes(json);
             await stream.WriteAsync(bytes);
         }
@@ -342,14 +412,59 @@ namespace Wiki
         /// <summary>
         /// Converts an article to JSON.
         /// </summary>
-        /// <param name="article">The article to convert.</param>
+        /// <param name="entry">The article to convert.</param>
         /// <returns>The cardinal JSON form of it.</returns>
-        protected string ConvertArticleToJson(Article article)
+        protected static string ConvertEntryToJson(object entry)
         {
-            return JsonConvert.SerializeObject(article, Formatting.None, Serialization);
+            return JsonConvert.SerializeObject(entry, Formatting.None, Serialization);
+        }
+        /// <summary>
+        /// Ensures the article is ready to be saved.
+        /// </summary>
+        /// <param name="article"></param>
+        protected void Stablize(Article article)
+        {
+            // Key
+            if (string.IsNullOrWhiteSpace(article.Key))
+            {
+                if (string.IsNullOrWhiteSpace(article.Title))
+                {
+                    article.Key = Guid.NewGuid().ToString("N");
+                }
+                else
+                {
+                    article.Key = ConformKey(article.Title.Sanatize());
+                }
+            }
+            article.Key = article.Key.Trim();
+            // Title -- intentionally after key.
+            if (string.IsNullOrWhiteSpace(article.Title))
+            {
+                article.Title = Resources.Text.DefaultArticleName;
+            }
+            article.Title = article.Title.Trim();
+            // Body
+            article.Dehydrate();
+            // Modified
+            article.Modified = DateTimeOffset.Now;
+        }
+        /// <summary>
+        /// Checks if we need to save because something changed.
+        /// </summary>
+        /// <returns>Async handle.</returns>
+        private async Task AutoSaveCheckAsync()
+        {
+            if (Autosave)
+            {
+                await SaveAsync();
+            }
         }
 
+        #endregion
+
+        #region Connectivity
         protected IRetryPolicy Retry { get { return Factory.Config.RetryPolicy; } }
+
         /// <summary>
         /// Confirms that we're connected when the method ends.
         /// </summary>
@@ -376,36 +491,8 @@ namespace Wiki
                 throw new RetryExhaustedException(info.PriorAttempts);
             }
         }
-        /// <summary>
-        /// Ensures the article is ready to be saved.
-        /// </summary>
-        /// <param name="article"></param>
-        protected void Stablize(Article article)
-        {
-            // Key
-            if(string.IsNullOrWhiteSpace(article.Key))
-            {
-                if (string.IsNullOrWhiteSpace(article.Title))
-                {
-                    article.Key = Guid.NewGuid().ToString("N");
-                }
-                else
-                {
-                    article.Key = ConformKey(article.Title.Sanatize());
-                }
-            }
-            article.Key = article.Key.Trim();
-            // Title -- intentionally after key.
-            if (string.IsNullOrWhiteSpace(article.Title))
-            {
-                article.Title = Resources.Text.DefaultArticleName;
-            }
-            article.Title = article.Title.Trim();
-            // Body
-            article.Content.Apply(content => content.Stablize(article));
-            // Modified
-            article.Modified = DateTimeOffset.Now;
-        }
+
+        #endregion
 
         #endregion
     }

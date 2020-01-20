@@ -10,6 +10,7 @@ namespace Wiki
     /// </summary>
     public interface IWiki : IAsyncDisposable
     {
+        #region Connectivity
         /// <summary>
         /// The moniker that uniquely defines this wiki (usually, but not always a URI).
         /// </summary>
@@ -38,6 +39,9 @@ namespace Wiki
         /// </summary>
         /// <returns>Async Handle.</returns>
         Task CloseAsync();
+        #endregion
+
+        #region Articles
         /// <summary>
         /// Gets an article by it's key.
         /// </summary>
@@ -59,5 +63,17 @@ namespace Wiki
         /// <param name="key">The key to delete.</param>
         /// <returns>Async key.</returns>
         Task DeleteAsync(string key);
+        #endregion
+
+        #region Metadata
+        /// <summary>
+        /// Obtain a specific type of metadata about this wiki.  If it doesn't exist,
+        /// it does now.
+        /// </summary>
+        /// <typeparam name="TMetadata">Type of metadata you're interested in.</typeparam>
+        /// <returns>The one instance of that metadata for this wiki.</returns>
+        Task<TMetadata> Metadata<TMetadata>()
+            where TMetadata : MetadataInfo, new();
+        #endregion
     }
 }

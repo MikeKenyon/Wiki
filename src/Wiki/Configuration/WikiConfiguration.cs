@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace Wiki.Configuration
 {
@@ -31,6 +32,12 @@ namespace Wiki.Configuration
         /// </summary>
         public IRetryPolicy RetryPolicy { get; set; } =
             new SlowDownRetryPolicy { Delay = TimeSpan.FromSeconds(0.5), NumberOfRetries = 10 };
+
+        /// <summary>
+        /// Defines how the system should handle the case when the retry policy has reached its
+        /// end and we have not yet completed the action at hand.
+        /// </summary>
+        public Action<Task> RetryFailure { get; set; } = f => { };
 
         /// <summary>
         /// Parameters getting passed around for configuration.

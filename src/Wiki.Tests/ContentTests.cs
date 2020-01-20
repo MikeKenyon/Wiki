@@ -89,7 +89,7 @@ namespace Wiki.Tests
             {
                 Rehydrated = true;
             }
-            protected internal override void Stablize(Article article)
+            protected internal override void Dehydrate(Article article)
             {
                 Stablized = true;
             }

@@ -10,7 +10,7 @@ namespace Wiki
     /// <summary>
     /// An article in a wiki.
     /// </summary>
-    public sealed class Article 
+    public sealed class Article : IHydrate
     {
         #region Data
         [JsonProperty("Content")]
@@ -47,6 +47,7 @@ namespace Wiki
         /// </summary>
         [JsonIgnore]
         public ReadOnlyObservableCollection<Content> Content { get; }
+
         #endregion
 
         #region Methods
@@ -75,6 +76,25 @@ namespace Wiki
 
             return this;
         }
+        #endregion
+
+        #region Hydration
+        /// <summary>
+        /// Called right before content is serialized to stablize it.
+        /// </summary>
+        public void Dehydrate()
+        {
+            Content.Apply(c => c.Dehydrate(this));
+        }
+
+        /// <summary>
+        /// Called right after content has been deserialized to allow it to "pop" out.
+        /// </summary>
+        public void Rehydrate()
+        {
+            Content.Apply(c => c.Rehydrate(this));
+        }
+
         #endregion
 
         #region Overrides

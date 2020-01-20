@@ -14,7 +14,7 @@ namespace Wiki
         /// Prepares the content to be saved.  
         /// </summary>
         /// <param name="article">The article this is being saved as part of.</param>
-        protected internal virtual void Stablize(Article article)
+        protected internal virtual void Dehydrate(Article article)
         {
 
         }

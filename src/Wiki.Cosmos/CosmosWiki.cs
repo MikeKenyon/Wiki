@@ -16,7 +16,8 @@ namespace Wiki.Cosmos
             throw new NotImplementedException();
         }
 
-        protected override Task<Stream> GetStreamForKeyAsync(string key, FileAccess access)
+        protected override Task<Stream> GetStreamForKeyAsync(WikiEntryType type,
+            string key, FileAccess access)
         {
             throw new NotImplementedException();
         }
@@ -27,6 +28,11 @@ namespace Wiki.Cosmos
         }
 
         protected override Task StoreAsync(Article article)
+        {
+            throw new NotImplementedException();
+        }
+
+        protected override Task StoreAsync(MetadataInfo metadata)
         {
             throw new NotImplementedException();
         }
