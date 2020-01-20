@@ -69,7 +69,7 @@ namespace Wiki
         /// <summary>
         /// The cache of loaded metadata.
         /// </summary>
-        private Dictionary<Type, MetadataInfo> _mdCache = new Dictionary<Type, MetadataInfo>();
+        private Dictionary<Type, Metadata> _mdCache = new Dictionary<Type, Metadata>();
         #endregion
 
         #region Lifecycle
@@ -203,7 +203,7 @@ namespace Wiki
         #endregion
 
         #region Metadata
-        public async Task<TMetadata> Metadata<TMetadata>() where TMetadata : MetadataInfo, new()
+        public async Task<TMetadata> Metadata<TMetadata>() where TMetadata : Metadata, new()
         {
             // Cache check
             var type = typeof(TMetadata);
@@ -259,7 +259,7 @@ namespace Wiki
         /// </summary>
         /// <param name="metadata">The metadata to store, no checks required.</param>
         /// <returns>Async handle.</returns>
-        protected abstract Task StoreAsync(MetadataInfo metadata);
+        protected abstract Task StoreAsync(Metadata metadata);
 
 
         /// <summary>
@@ -375,7 +375,7 @@ namespace Wiki
             var type = sender.GetType();
             //TODO: Do this async with a Polly listener.
             //TODO: Replace current retry with polly
-            StoreAsync(sender as MetadataInfo)
+            StoreAsync(sender as Metadata)
                 .ContinueWith(t => AutoSaveCheckAsync())
                 .Wait();
         }

@@ -11,7 +11,7 @@ namespace Wiki
     /// settings about the wiki stored _in_ the wiki.  This is the base class that you
     /// should derive off of to have the wiki store content about itself.
     /// </summary>
-    public abstract class MetadataInfo : IHydrate, INotifyPropertyChanged
+    public abstract class Metadata : IHydrate, INotifyPropertyChanged
     {
         public event PropertyChangedEventHandler PropertyChanged;
         #region Hydration

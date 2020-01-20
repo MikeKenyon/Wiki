@@ -73,7 +73,7 @@ namespace Wiki
         /// <typeparam name="TMetadata">Type of metadata you're interested in.</typeparam>
         /// <returns>The one instance of that metadata for this wiki.</returns>
         Task<TMetadata> Metadata<TMetadata>()
-            where TMetadata : MetadataInfo, new();
+            where TMetadata : Metadata, new();
         #endregion
     }
 }

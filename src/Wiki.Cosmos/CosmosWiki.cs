@@ -32,7 +32,7 @@ namespace Wiki.Cosmos
             throw new NotImplementedException();
         }
 
-        protected override Task StoreAsync(MetadataInfo metadata)
+        protected override Task StoreAsync(Metadata metadata)
         {
             throw new NotImplementedException();
         }

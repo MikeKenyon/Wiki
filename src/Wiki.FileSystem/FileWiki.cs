@@ -157,7 +157,7 @@ namespace Wiki.FileSystem
             };
         }
 
-        protected override Task StoreAsync(MetadataInfo metadata)
+        protected override Task StoreAsync(Metadata metadata)
         {
             var json = ConvertEntryToJson(metadata);
             var path = @$"Metdata\{metadata.GetType().Name}";
