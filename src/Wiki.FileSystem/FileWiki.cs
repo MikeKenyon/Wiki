@@ -87,7 +87,7 @@ namespace Wiki.FileSystem
             switch (type)
             {
                 case WikiEntryType.Metadata:
-                    path = @$"Metadata\{key}";
+                    path = @$"Metadata/{key}";
                     break;
                 case WikiEntryType.Article:
                     path = KeyToFilePath(key);
@@ -96,7 +96,7 @@ namespace Wiki.FileSystem
                     throw new NotImplementedException($"Entry type {type} is not handled.");
             }
             var entry = (from e in Store.Entries
-                         where string.Equals(e.FileName, key, StringComparison.OrdinalIgnoreCase)
+                         where string.Equals(e.FileName, path, StringComparison.OrdinalIgnoreCase)
                          select e).FirstOrDefault();
             if (entry != null)
             {
@@ -160,7 +160,7 @@ namespace Wiki.FileSystem
         protected override Task StoreAsync(Metadata metadata)
         {
             var json = ConvertEntryToJson(metadata);
-            var path = @$"Metdata\{metadata.GetType().Name}";
+            var path = @$"Metadata/{metadata.GetType().Name}";
             //TODO: Test next line, not sure if the entry contains path.
             if (Store.ContainsEntry(path))
             {

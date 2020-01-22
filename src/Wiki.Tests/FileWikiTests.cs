@@ -55,6 +55,61 @@ namespace Wiki.Tests
             }
         }
         [TestMethod]
+        public async Task MetadataLoadFileWiki()
+        {
+            // Arrange
+            var path = Path.GetTempFileName();
+            IWiki wiki = null;
+            File.Delete(path);
+            try
+            {
+                var services = new ServiceCollection();
+                var config = new Configuration.WikiConfiguration(services)
+                {
+                };
+                var factory = new FileWikiFactory(config);
+                var options = new WikiOpenOptions
+                {
+                    NotFound = WikiMissingBehavior.Create,
+                    ThrowOnFailureToOpen = true,
+                    ThrowOnInvalid = true,
+                };
+                var flail = new WikiOpenOptions
+                {
+                    NotFound = WikiMissingBehavior.Throw,
+                    ThrowOnFailureToOpen = true,
+                    ThrowOnInvalid = true,
+                };
+                var article = new Article
+                {
+                    Title = "Test",
+                }.Set<Body>(new Body { Markdown = "This is **content**." });
+                // Act
+                wiki = await factory.OpenWikiAsync(path, options);
+                var md = await wiki.Metadata<GenericMetadata>();
+                md.Data["Key"] = "value";
+                md.FlagUpdate();
+                await wiki.UpsertAsync(article);
+                await wiki.SaveAsync();
+                await wiki.DisposeAsync(); // released the lock
+
+                wiki = await factory.OpenWikiAsync(path, flail);
+                md = await wiki.Metadata<GenericMetadata>();
+                // Assert
+                Assert.IsNotNull(md);
+                Assert.AreEqual(1, md.Data.Count);
+                Assert.AreEqual("value", md.Data["Key"]);
+            }
+            finally
+            {
+                if (wiki != null)
+                {
+                    await wiki.DisposeAsync();
+                }
+                File.Delete(path);
+            }
+        }
+        [TestMethod]
         public async Task RouteTripOneArticleWiki()
         {
             // Arrange
