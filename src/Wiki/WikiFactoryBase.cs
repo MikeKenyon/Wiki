@@ -140,7 +140,9 @@ namespace Wiki
         protected abstract bool IsMine(IWiki wiki);
         protected virtual async Task CloseAsync(IWiki wiki)
         {
-            await wiki.DisposeAsync();
+            // TODO: Std 2.1 Support DisposeAsync
+             wiki.Dispose();
+            await Task.Yield();
         }
 
 

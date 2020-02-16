@@ -62,6 +62,8 @@ namespace Wiki
         #endregion
 
         #region Data
+        // To detect redundant calls
+        private bool _disposedValue = false; 
         /// <summary>
         /// The factory that generated this wiki.
         /// </summary>
@@ -120,15 +122,6 @@ namespace Wiki
         public abstract Task SaveAsync();
 
         /// <summary>
-        /// Disposes of this reference to the wiki, commiting any changes.
-        /// </summary>
-        /// <returns></returns>
-        public ValueTask DisposeAsync()
-        {
-            return new ValueTask(CloseAsync());
-        }
-
-        /// <summary>
         /// Connects to the wiki if it wasn't already.
         /// </summary>
         /// <returns>Async handle.</returns>
@@ -160,7 +153,7 @@ namespace Wiki
                 if (stream != null)
                 {
                     article = GetEntryFromStream<Article>(stream);
-                    await stream.DisposeAsync();
+                    stream.Dispose();
                     Cache(article);
                 }
             }
@@ -390,11 +383,13 @@ namespace Wiki
         /// <returns>The contents of the stream.</returns>
         private T GetEntryFromStream<T>(Stream stream) where T : IHydrate
         {
-            using var reader = new StreamReader(stream, Encoding.UTF8);
-            var json = reader.ReadToEnd();
-            var entry = JsonConvert.DeserializeObject<T>(json, Serialization);
-            entry.Rehydrate();
-            return entry;
+            using (var reader = new StreamReader(stream, Encoding.UTF8))
+            {
+                var json = reader.ReadToEnd();
+                var entry = JsonConvert.DeserializeObject<T>(json, Serialization);
+                entry.Rehydrate();
+                return entry;
+            }
         }
 
         /// <summary>
@@ -406,7 +401,7 @@ namespace Wiki
         {
             var json = ConvertEntryToJson(article);
             var bytes = Encoding.UTF8.GetBytes(json);
-            await stream.WriteAsync(bytes);
+            await stream.WriteAsync(bytes, 0, bytes.Length);
         }
 
         /// <summary>
@@ -491,6 +486,34 @@ namespace Wiki
                 throw new RetryExhaustedException(info.PriorAttempts);
             }
         }
+
+        #region IDisposable Support
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!_disposedValue)
+            {
+                if (disposing)
+                {
+                    CloseAsync().Wait();
+                }
+
+                _disposedValue = true;
+            }
+        }
+
+        // This code added to correctly implement the disposable pattern.
+        public void Dispose()
+        {
+            // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
+            Dispose(true);
+        }
+        public ValueTask DisposeAsync()
+        {
+            _disposedValue = true;
+            return new ValueTask(CloseAsync());
+        }
+        #endregion
 
         #endregion
 

@@ -8,7 +8,7 @@ namespace Wiki
     /// <summary>
     /// The interface for a wiki.  
     /// </summary>
-    public interface IWiki : IAsyncDisposable
+    public interface IWiki : IDisposable
     {
         #region Connectivity
         /// <summary>
@@ -74,6 +74,10 @@ namespace Wiki
         /// <returns>The one instance of that metadata for this wiki.</returns>
         Task<TMetadata> Metadata<TMetadata>()
             where TMetadata : Metadata, new();
+        #endregion
+
+        #region Std 2.1 Future Compatibility
+        ValueTask DisposeAsync();
         #endregion
     }
 }

@@ -30,7 +30,8 @@ namespace Wiki.Configuration
                 {
                     seq.MoveNext();
                     var multiple = seq.Current;
-                    currentState.Delay = Delay * multiple;
+                    //TODO: Std2.1 currentState.Delay = Delay * multiple;
+                    currentState.Delay = TimeSpan.FromMilliseconds( Delay.TotalMilliseconds * multiple);
                 }
                 else
                 {

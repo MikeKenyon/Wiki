@@ -64,12 +64,21 @@ namespace Wiki
         /// <returns><see langword="true"/> if this is a legit character</returns>
         private static bool ValidKeySymbol(char symbol)
         {
-            return symbol switch
+            switch(symbol)
             {
-                '-' => true,
-                '.' => true,
-                _ => false,
-            };
+                case '-':
+                case '.':
+                    return true;
+                default:
+                    return false;
+            }
+            //TODO: Once 2.1 is supported by UWP
+            //return symbol switch
+            //{
+            //    '-' => true,
+            //    '.' => true,
+            //    _ => false,
+            //};
         }
     }
 }

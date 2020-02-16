@@ -87,7 +87,7 @@ namespace Wiki.FileSystem
             switch (type)
             {
                 case WikiEntryType.Metadata:
-                    path = @$"Metadata/{key}";
+                    path = $@"Metadata/{key}";
                     break;
                 case WikiEntryType.Article:
                     path = KeyToFilePath(key);
@@ -149,18 +149,26 @@ namespace Wiki.FileSystem
         private string KeyToFilePath(string key)
         {
             var route = key.ToLowerInvariant();
-            return key.Length switch
+            // TODO: Post Std 2.1
+            //return key.Length switch
+            //{
+            //    1 => $"{route}/{key}",
+            //    2 => $"{route[0]}/{route[1]}/{key}",
+            //    _ => $"{route[0]}/{route[1]}/{route[2]}/{key}"
+            //};
+            switch(key.Length)
             {
-                1 => $"{route}/{key}",
-                2 => $"{route[0]}/{route[1]}/{key}",
-                _ => $"{route[0]}/{route[1]}/{route[2]}/{key}"
-            };
+                case 1: return $"{route}/{key}";
+                case 2: return $"{route[0]}/{route[1]}/{key}";
+                default:
+                    return $"{route[0]}/{route[1]}/{route[2]}/{key}";
+            }
         }
 
         protected override Task StoreAsync(Metadata metadata)
         {
             var json = ConvertEntryToJson(metadata);
-            var path = @$"Metadata/{metadata.GetType().Name}";
+            var path = $@"Metadata/{metadata.GetType().Name}";
             //TODO: Test next line, not sure if the entry contains path.
             if (Store.ContainsEntry(path))
             {
