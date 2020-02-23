@@ -35,6 +35,12 @@ steps:
     packagesToPack: '**/Wiki.csproj'
     versioningScheme: 'off'
 
+- task: DotNetCoreCLI@2
+  inputs:
+    command: 'pack'
+    packagesToPack: '**/Wiki.FileSystem.csproj'
+    versioningScheme: 'off'
+
 - task: PublishBuildArtifacts@1
   inputs:
     PathtoPublish: '$(Build.ArtifactStagingDirectory)'
